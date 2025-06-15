@@ -1,0 +1,159 @@
+/*
+SQLyog Community v13.3.0 (64 bit)
+MySQL - 8.0.30 : Database - ecommerce
+*********************************************************************
+*/
+
+/*!40101 SET NAMES utf8 */;
+
+/*!40101 SET SQL_MODE=''*/;
+
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+CREATE DATABASE /*!32312 IF NOT EXISTS*/`ecommerce` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+
+USE `ecommerce`;
+
+/*Table structure for table `carts` */
+
+DROP TABLE IF EXISTS `carts`;
+
+CREATE TABLE `carts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `nft_id` int NOT NULL,
+  `quantity` int DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `nft_id` (`nft_id`),
+  CONSTRAINT `carts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `carts_ibfk_2` FOREIGN KEY (`nft_id`) REFERENCES `nfts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+/*Data for the table `carts` */
+
+LOCK TABLES `carts` WRITE;
+
+UNLOCK TABLES;
+
+/*Table structure for table `categories` */
+
+DROP TABLE IF EXISTS `categories`;
+
+CREATE TABLE `categories` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `title` varchar(100) NOT NULL,
+  `slug` varchar(100) NOT NULL,
+  `image` varchar(255) DEFAULT NULL,
+  `description` text,
+  `thumbnail` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `slug` (`slug`)
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+/*Data for the table `categories` */
+
+LOCK TABLES `categories` WRITE;
+
+insert  into `categories`(`id`,`title`,`slug`,`image`,`description`,`thumbnail`) values 
+(1,'Digital Art','digital-art','/img/categories/digital-art.png',NULL,NULL),
+(2,'Music','music','/img/categories/music.png',NULL,NULL),
+(3,'Collectibles','collectibles','/img/categories/collectibles.png',NULL,NULL),
+(4,'Virtual Worlds','virtual-worlds','/img/categories/virtual-worlds.png',NULL,NULL),
+(6,'dadad','dadad',NULL,'adssad','https://unsplash.com/photos/w-Nwek3KLlE'),
+(7,'lukisan','lukisan',NULL,'lussa','');
+
+UNLOCK TABLES;
+
+/*Table structure for table `nfts` */
+
+DROP TABLE IF EXISTS `nfts`;
+
+CREATE TABLE `nfts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `title` varchar(150) NOT NULL,
+  `category_id` int NOT NULL,
+  `price` decimal(10,2) DEFAULT NULL,
+  `image` varchar(255) DEFAULT NULL,
+  `creator` varchar(100) DEFAULT NULL,
+  `description` text,
+  `tags` text,
+  PRIMARY KEY (`id`),
+  KEY `category_id` (`category_id`),
+  CONSTRAINT `nfts_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+/*Data for the table `nfts` */
+
+LOCK TABLES `nfts` WRITE;
+
+insert  into `nfts`(`id`,`title`,`category_id`,`price`,`image`,`creator`,`description`,`tags`) values 
+(1,'Cyber Ape #1',1,2.50,'/img/nfts/ape1.png','0x123abc','Exclusive digital artwork from the Cyber Ape collection.','[\"art\", \"ape\", \"exclusive\"]'),
+(2,'Chill Beats #2',2,1.00,'/img/nfts/beat2.png','0x456def','A soothing lo-fi beat track.','[\"music\", \"lofi\", \"vibe\"]'),
+(3,'Pixel Sword',3,3.25,'/img/nfts/sword.png','0x789ghi','Limited edition collectible weapon.','[\"collectible\", \"weapon\", \"pixel\"]'),
+(4,'Metaverse Land Plot A1',4,15.75,'/img/nfts/land.png','0xabcd1234','Virtual land in a booming metaverse.','[\"virtual\", \"land\", \"real-estate\"]');
+
+UNLOCK TABLES;
+
+/*Table structure for table `orders` */
+
+DROP TABLE IF EXISTS `orders`;
+
+CREATE TABLE `orders` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `total_price` decimal(10,2) NOT NULL,
+  `status` varchar(50) DEFAULT 'pending',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `orders_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+/*Data for the table `orders` */
+
+LOCK TABLES `orders` WRITE;
+
+UNLOCK TABLES;
+
+/*Table structure for table `users` */
+
+DROP TABLE IF EXISTS `users`;
+
+CREATE TABLE `users` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `username` varchar(100) DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `address` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `role` varchar(50) DEFAULT 'user',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `username` (`username`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+/*Data for the table `users` */
+
+LOCK TABLES `users` WRITE;
+
+insert  into `users`(`id`,`name`,`username`,`email`,`password`,`phone`,`address`,`created_at`,`role`) values 
+(1,'Admin User','admin123','admin@example.com','admin',NULL,NULL,'2025-06-15 12:00:40','admin'),
+(2,'Admin User','admin1234','admin@admin.com','$2y$10$tHY/3sJTD4TSISdrT8N2M.hdNPx7uBPyXAEcuztq6qHjZ2Eep6FCi',NULL,NULL,'2025-06-15 12:06:38','admin'),
+(10,'Admin User','admin','admin@contoh.com','$2y$12$sncIhVJn7DsXBZLigT51eeMFAwBJzF9gF9nktp5YvtWLpHA.Rc/Ge',NULL,NULL,'2025-06-15 12:11:15','admin'),
+(11,'Alice Johnson',NULL,'alice@example.com','password123','081234567890','Jl. Merdeka No. 1','2025-06-15 13:46:01','user'),
+(12,'Bob Smith',NULL,'bob@example.com','password123','081298765432','Jl. Sudirman No. 22','2025-06-15 13:46:01','user'),
+(13,'Charlie Brown',NULL,'charlie@example.com','password123','082112345678','Jl. Gatot Subroto No. 8','2025-06-15 13:46:01','user'),
+(14,'nova',NULL,'asasdas@gmail.copm','$2y$12$fG/39exIn8VZ6UzTyQxg9erkp4hZv.2EAkutk2og2rXFwRTlzx.Dq','','','2025-06-15 13:46:45','user');
+
+UNLOCK TABLES;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
