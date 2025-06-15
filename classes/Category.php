@@ -1,5 +1,5 @@
 <?php
-require_once 'config/database.php';
+require_once(__DIR__ . '/../config/database.php');
 
 class Category {
     private $conn;
@@ -99,6 +99,7 @@ class Category {
             $query .= " LIMIT :offset, :limit";
         }
 
+        
         $stmt = $this->conn->prepare($query);
 
         if ($limit > 0) {
@@ -109,4 +110,13 @@ class Category {
         $stmt->execute();
         return $stmt;
     }
+
+    public function existsBySlug() {
+    $query = "SELECT COUNT(*) FROM categories WHERE slug = :slug";
+    $stmt = $this->conn->prepare($query);
+    $stmt->bindParam(':slug', $this->slug);
+    $stmt->execute();
+    return $stmt->fetchColumn() > 0;
+}
+
 }

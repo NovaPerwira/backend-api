@@ -15,17 +15,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
     case 'create':
-        $category->slug = generate_slug($_POST['slug']);
-        $category->title = sanitize_input($_POST['title']);
-        $category->description = sanitize_input($_POST['description']);
-        $category->thumbnail = sanitize_input($_POST['thumbnail']);
+    $category->slug = generate_slug($_POST['slug']);
+    $category->title = sanitize_input($_POST['title']);
+    $category->description = sanitize_input($_POST['description']);
+    $category->thumbnail = sanitize_input($_POST['thumbnail']);
 
+    if ($category->existsBySlug()) {
+        set_flash_message('Slug already exists! Please use a different one.', 'error');
+    } else {
         if ($category->create()) {
             set_flash_message('Category created successfully!', 'success');
         } else {
             set_flash_message('Failed to create category.', 'error');
         }
-        break;
+    }
+    break;
+
+    
+
 
     case 'update':
         $category->slug = sanitize_input($_POST['slug']); // pakai slug, bukan id
@@ -167,8 +174,8 @@ include 'includes/header.php';
     <label class="block text-sm font-medium text-gray-700 mb-2">Category Type (Slug)</label>
     <select name="slug" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
         <option value="">-- Select Category Type --</option>
-        <option value="art">Art</option>
-        <option value="music">Music</option>
+        <option value="Wearables">Wearables</option>
+        <option value="Accessories">Accessories</option>
         <option value="gaming">Gaming</option>
         <option value="photography">Photography</option>
         <option value="collectibles">Collectibles</option>

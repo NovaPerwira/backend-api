@@ -7,10 +7,8 @@ header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit(0);
 }
-require_once('C:\laragon\www\php\api../config/database.php');
-require_once __DIR__ . '/../classes/Category.php';
-
-
+require_once(__DIR__ . '/../config/database.php');
+require_once(__DIR__ . '/../classes/Category.php');
 
 try {
     $database = new Database();
@@ -21,17 +19,18 @@ try {
 
     switch ($method) {
         case 'GET':
-            if (isset($_GET['id'])) {
-                // Get single category
-                $category->id = $_GET['id'];
-                if($category->readOne()) {
+            if (isset($_GET['slug'])) {
+                // Get single category by slug
+                $category->slug = $_GET['slug'];
+                if($category->readOneBySlug()) {
                     echo json_encode([
                         'success' => true,
                         'data' => [
                             'id' => (int)$category->id,
-                            'name' => $category->name,
+                            'slug' => $category->slug,
+                            'title' => $category->title,
                             'description' => $category->description,
-                            'created_at' => $category->created_at
+                            'thumbnail' => $category->thumbnail
                         ]
                     ]);
                 } else {
@@ -39,18 +38,40 @@ try {
                     echo json_encode(['success' => false, 'error' => 'Category not found']);
                 }
             } else {
-                // Get all categories
-                $stmt = $category->readAll();
+                // Get all categories with pagination
+                $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 0;
+                $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+                $offset = ($page - 1) * $limit;
+
+                $stmt = $category->readAll($limit, $offset);
                 $categories = [];
                 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                     $categories[] = [
                         'id' => (int)$row['id'],
-                        'name' => $row['name'],
+                        'slug' => $row['slug'],
+                        'title' => $row['title'],
                         'description' => $row['description'],
-                        'created_at' => $row['created_at']
+                        'thumbnail' => $row['thumbnail']
                     ];
                 }
-                echo json_encode(['success' => true, 'data' => $categories]);
+
+                $response = [
+                    'success' => true,
+                    'data' => $categories
+                ];
+
+                // Add pagination info if limit is set
+                if ($limit > 0) {
+                    $total = $category->count();
+                    $response['pagination'] = [
+                        'page' => $page,
+                        'limit' => $limit,
+                        'total' => (int)$total,
+                        'pages' => ceil($total / $limit)
+                    ];
+                }
+
+                echo json_encode($response);
             }
             break;
 
@@ -58,30 +79,32 @@ try {
             // Create new category
             $data = json_decode(file_get_contents("php://input"));
             
-            if (empty($data->name)) {
+            if (empty($data->title)) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'Category name is required']);
+                echo json_encode(['success' => false, 'error' => 'Category title is required']);
                 exit;
             }
 
-            $category->name = $data->name;
+            if (empty($data->slug)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Category slug is required']);
+                exit;
+            }
+
+            $category->slug = $data->slug;
+            $category->title = $data->title;
             $category->description = isset($data->description) ? $data->description : '';
-
-            // Check if category name exists
-            if($category->nameExists()) {
-                http_response_code(409);
-                echo json_encode(['success' => false, 'error' => 'Category name already exists']);
-                exit;
-            }
+            $category->thumbnail = isset($data->thumbnail) ? $data->thumbnail : '';
 
             if($category->create()) {
                 echo json_encode([
                     'success' => true,
                     'data' => [
                         'id' => (int)$db->lastInsertId(),
-                        'name' => $data->name,
+                        'slug' => $data->slug,
+                        'title' => $data->title,
                         'description' => $category->description,
-                        'created_at' => date('Y-m-d H:i:s')
+                        'thumbnail' => $category->thumbnail
                     ]
                 ]);
             } else {
@@ -91,28 +114,30 @@ try {
             break;
 
         case 'PUT':
-            // Update category
+            // Update category by slug
             $data = json_decode(file_get_contents("php://input"));
             
-            if (empty($data->id)) {
+            if (empty($data->slug)) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'Category ID is required']);
+                echo json_encode(['success' => false, 'error' => 'Category slug is required']);
                 exit;
             }
 
-            $category->id = $data->id;
-            $category->name = isset($data->name) ? $data->name : '';
+            $category->slug = $data->slug;
+            $category->title = isset($data->title) ? $data->title : '';
             $category->description = isset($data->description) ? $data->description : '';
+            $category->thumbnail = isset($data->thumbnail) ? $data->thumbnail : '';
 
-            if($category->update()) {
-                if($category->readOne()) {
+            if($category->updateBySlug()) {
+                if($category->readOneBySlug()) {
                     echo json_encode([
                         'success' => true,
                         'data' => [
                             'id' => (int)$category->id,
-                            'name' => $category->name,
+                            'slug' => $category->slug,
+                            'title' => $category->title,
                             'description' => $category->description,
-                            'created_at' => $category->created_at
+                            'thumbnail' => $category->thumbnail
                         ]
                     ]);
                 }
@@ -123,17 +148,17 @@ try {
             break;
 
         case 'DELETE':
-            // Delete category
+            // Delete category by slug
             $data = json_decode(file_get_contents("php://input"));
             
-            if (empty($data->id)) {
+            if (empty($data->slug)) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'Category ID is required']);
+                echo json_encode(['success' => false, 'error' => 'Category slug is required']);
                 exit;
             }
 
-            $category->id = $data->id;
-            if($category->delete()) {
+            $category->slug = $data->slug;
+            if($category->deleteBySlug()) {
                 echo json_encode(['success' => true, 'message' => 'Category deleted successfully']);
             } else {
                 http_response_code(500);

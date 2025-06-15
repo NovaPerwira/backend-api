@@ -8,8 +8,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit(0);
 }
 
-require_once '../classes/Database.php';
-require_once '../classes/Order.php';
+require_once(__DIR__ . '/../config/database.php');
+require_once(__DIR__ . '/../classes/Order.php');
 
 try {
     $database = new Database();
