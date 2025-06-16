@@ -1,5 +1,5 @@
 <?php
-header('Access-Control-Allow-Origin: http://localhost:3000');
+header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Content-Type: application/json');
@@ -10,225 +10,152 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 
 require_once(__DIR__ . '/../config/database.php');
 require_once(__DIR__ . '/../classes/Order.php');
+require_once(__DIR__ . '/../classes/OrderItem.php');
+require_once(__DIR__ . '/../classes/Cart.php');
+
+$database = new Database();
+$db = $database->getConnection();
+$order = new Order($db);
+$orderItem = new OrderItem($db);
+$cart = new Cart($db);
+
+$method = $_SERVER['REQUEST_METHOD'];
+$request_uri = $_SERVER['REQUEST_URI'];
+
+// Check authentication
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Authentication required']);
+    exit;
+}
+
+$user_id = $_SESSION['user_id'];
 
 try {
-    $database = new Database();
-    $db = $database->getConnection();
-    $order = new Order($db);
+    if (strpos($request_uri, '/checkout') !== false && $method === 'POST') {
+        // Checkout - create order from cart
+        $data = json_decode(file_get_contents("php://input"));
+        
+        // Get cart items
+        $cart->user_id = $user_id;
+        $stmt = $cart->getByUser();
+        $cart_items = [];
+        $total_price = 0;
 
-    $method = $_SERVER['REQUEST_METHOD'];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $item_total = $row['price'] * $row['quantity'];
+            $total_price += $item_total;
+            $cart_items[] = $row;
+        }
 
-    switch ($method) {
-        case 'GET':
-            if (isset($_GET['id'])) {
-                // Get single order
-                $order->id = $_GET['id'];
-                $result = $order->readOne();
-                if($result) {
-                    $orderData = [
-                        'id' => (int)$order->id,
-                        'nft_id' => (int)$order->nft_id,
-                        'buyer_id' => (int)$order->buyer_id,
-                        'seller_id' => (int)$order->seller_id,
-                        'price' => (float)$order->price,
-                        'status' => $order->status,
-                        'created_at' => $order->created_at
-                    ];
-                    
-                    if ($result['nft_title']) {
-                        $orderData['nft'] = [
-                            'id' => (int)$result['nft_id'],
-                            'title' => $result['nft_title'],
-                            'description' => $result['nft_description'],
-                            'image_url' => $result['nft_image']
-                        ];
-                    }
-                    
-                    if ($result['buyer_name']) {
-                        $orderData['buyer'] = [
-                            'id' => (int)$result['buyer_id'],
-                            'name' => $result['buyer_name'],
-                            'email' => $result['buyer_email']
-                        ];
-                    }
-                    
-                    if ($result['seller_name']) {
-                        $orderData['seller'] = [
-                            'id' => (int)$result['seller_id'],
-                            'name' => $result['seller_name'],
-                            'email' => $result['seller_email']
-                        ];
-                    }
-                    
-                    echo json_encode(['success' => true, 'data' => $orderData]);
-                } else {
-                    http_response_code(404);
-                    echo json_encode(['success' => false, 'error' => 'Order not found']);
-                }
-            } else {
-                // Get all orders
-                $stmt = $order->readAll();
-                $orders = [];
-                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $orderData = [
-                        'id' => (int)$row['id'],
-                        'nft_id' => (int)$row['nft_id'],
-                        'buyer_id' => (int)$row['buyer_id'],
-                        'seller_id' => (int)$row['seller_id'],
-                        'price' => (float)$row['price'],
-                        'status' => $row['status'],
-                        'created_at' => $row['created_at']
-                    ];
-                    
-                    if ($row['nft_title']) {
-                        $orderData['nft'] = [
-                            'id' => (int)$row['nft_id'],
-                            'title' => $row['nft_title'],
-                            'description' => $row['nft_description'],
-                            'image_url' => $row['nft_image']
-                        ];
-                    }
-                    
-                    if ($row['buyer_name']) {
-                        $orderData['buyer'] = [
-                            'id' => (int)$row['buyer_id'],
-                            'name' => $row['buyer_name'],
-                            'email' => $row['buyer_email']
-                        ];
-                    }
-                    
-                    if ($row['seller_name']) {
-                        $orderData['seller'] = [
-                            'id' => (int)$row['seller_id'],
-                            'name' => $row['seller_name'],
-                            'email' => $row['seller_email']
-                        ];
-                    }
-                    
-                    $orders[] = $orderData;
-                }
-                echo json_encode(['success' => true, 'data' => $orders]);
-            }
-            break;
+        if (empty($cart_items)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Cart is empty']);
+            exit;
+        }
 
-        case 'POST':
-            // Create new order
-            $data = json_decode(file_get_contents("php://input"));
+        // Create order
+        $order->user_id = $user_id;
+        $order->total_price = $total_price;
+        $order->status = 'pending';
+
+        if($order->create()) {
+            $order_id = $db->lastInsertId();
             
-            if (empty($data->nft_id) || empty($data->buyer_id) || empty($data->seller_id) || empty($data->price)) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'NFT ID, buyer ID, seller ID, and price are required']);
-                exit;
+            // Create order items
+            foreach ($cart_items as $item) {
+                $orderItem->order_id = $order_id;
+                $orderItem->product_id = $item['product_id'];
+                $orderItem->quantity = $item['quantity'];
+                $orderItem->price_at_purchase = $item['price'];
+                $orderItem->create();
             }
 
-            $order->nft_id = $data->nft_id;
-            $order->buyer_id = $data->buyer_id;
-            $order->seller_id = $data->seller_id;
-            $order->price = $data->price;
-            $order->status = isset($data->status) ? $data->status : 'pending';
+            // Clear cart
+            $cart->clear();
 
-            if($order->create()) {
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'order_id' => (int)$order_id,
+                    'total_price' => (float)$total_price,
+                    'status' => 'pending'
+                ]
+            ]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to create order']);
+        }
+
+    } elseif ($method === 'GET') {
+        // Check if requesting single order
+        $path_parts = explode('/', trim(parse_url($request_uri, PHP_URL_PATH), '/'));
+        $order_id = end($path_parts);
+        
+        if ($order_id && is_numeric($order_id)) {
+            // Get single order
+            $order->id = $order_id;
+            $result = $order->readOne();
+            
+            if($result && $result['user_id'] == $user_id) {
+                // Get order items
+                $orderItem->order_id = $order_id;
+                $items_stmt = $orderItem->getByOrder();
+                $items = [];
+                
+                while ($item = $items_stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $items[] = [
+                        'id' => (int)$item['id'],
+                        'product_id' => (int)$item['product_id'],
+                        'title' => $item['title'],
+                        'slug' => $item['slug'],
+                        'image' => $item['image'],
+                        'quantity' => (int)$item['quantity'],
+                        'price_at_purchase' => (float)$item['price_at_purchase']
+                    ];
+                }
+
                 echo json_encode([
                     'success' => true,
                     'data' => [
-                        'id' => (int)$db->lastInsertId(),
-                        'nft_id' => (int)$order->nft_id,
-                        'buyer_id' => (int)$order->buyer_id,
-                        'seller_id' => (int)$order->seller_id,
-                        'price' => (float)$order->price,
+                        'id' => (int)$order->id,
+                        'user_id' => (int)$order->user_id,
+                        'total_price' => (float)$order->total_price,
                         'status' => $order->status,
-                        'created_at' => date('Y-m-d H:i:s')
+                        'created_at' => $order->created_at,
+                        'items' => $items
                     ]
                 ]);
             } else {
-                http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Failed to create order']);
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Order not found']);
             }
-            break;
-
-        case 'PUT':
-            // Update order
-            $data = json_decode(file_get_contents("php://input"));
+        } else {
+            // Get user's orders
+            $order->user_id = $user_id;
+            $stmt = $order->readByUser();
+            $orders = [];
             
-            if (empty($data->id)) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'Order ID is required']);
-                exit;
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $orders[] = [
+                    'id' => (int)$row['id'],
+                    'user_id' => (int)$row['user_id'],
+                    'total_price' => (float)$row['total_price'],
+                    'status' => $row['status'],
+                    'created_at' => $row['created_at']
+                ];
             }
 
-            $order->id = $data->id;
-            $order->status = isset($data->status) ? $data->status : '';
-            $order->price = isset($data->price) ? $data->price : 0;
+            echo json_encode([
+                'success' => true,
+                'data' => $orders
+            ]);
+        }
 
-            if($order->update()) {
-                $result = $order->readOne();
-                if($result) {
-                    $orderData = [
-                        'id' => (int)$order->id,
-                        'nft_id' => (int)$order->nft_id,
-                        'buyer_id' => (int)$order->buyer_id,
-                        'seller_id' => (int)$order->seller_id,
-                        'price' => (float)$order->price,
-                        'status' => $order->status,
-                        'created_at' => $order->created_at
-                    ];
-                    
-                    if ($result['nft_title']) {
-                        $orderData['nft'] = [
-                            'id' => (int)$result['nft_id'],
-                            'title' => $result['nft_title'],
-                            'description' => $result['nft_description'],
-                            'image_url' => $result['nft_image']
-                        ];
-                    }
-                    
-                    if ($result['buyer_name']) {
-                        $orderData['buyer'] = [
-                            'id' => (int)$result['buyer_id'],
-                            'name' => $result['buyer_name'],
-                            'email' => $result['buyer_email']
-                        ];
-                    }
-                    
-                    if ($result['seller_name']) {
-                        $orderData['seller'] = [
-                            'id' => (int)$result['seller_id'],
-                            'name' => $result['seller_name'],
-                            'email' => $result['seller_email']
-                        ];
-                    }
-                    
-                    echo json_encode(['success' => true, 'data' => $orderData]);
-                }
-            } else {
-                http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Failed to update order']);
-            }
-            break;
-
-        case 'DELETE':
-            // Delete order
-            $data = json_decode(file_get_contents("php://input"));
-            
-            if (empty($data->id)) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'Order ID is required']);
-                exit;
-            }
-
-            $order->id = $data->id;
-            if($order->delete()) {
-                echo json_encode(['success' => true, 'message' => 'Order deleted successfully']);
-            } else {
-                http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Failed to delete order']);
-            }
-            break;
-
-        default:
-            http_response_code(405);
-            echo json_encode(['success' => false, 'error' => 'Method not allowed']);
-            break;
+    } else {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Method not allowed']);
     }
 
 } catch (Exception $e) {

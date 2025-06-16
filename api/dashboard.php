@@ -1,5 +1,5 @@
 <?php
-header('Access-Control-Allow-Origin: http://localhost:3000');
+header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Content-Type: application/json');
@@ -20,11 +20,11 @@ try {
     $userStmt->execute();
     $totalUsers = $userStmt->fetch(PDO::FETCH_ASSOC)['total'];
 
-    // Get total NFTs
-    $nftQuery = "SELECT COUNT(*) as total FROM nfts";
-    $nftStmt = $db->prepare($nftQuery);
-    $nftStmt->execute();
-    $totalNFTs = $nftStmt->fetch(PDO::FETCH_ASSOC)['total'];
+    // Get total products
+    $productQuery = "SELECT COUNT(*) as total FROM products";
+    $productStmt = $db->prepare($productQuery);
+    $productStmt->execute();
+    $totalProducts = $productStmt->fetch(PDO::FETCH_ASSOC)['total'];
 
     // Get total orders
     $orderQuery = "SELECT COUNT(*) as total FROM orders";
@@ -33,7 +33,7 @@ try {
     $totalOrders = $orderStmt->fetch(PDO::FETCH_ASSOC)['total'];
 
     // Get total revenue
-    $revenueQuery = "SELECT COALESCE(SUM(price), 0) as total FROM orders WHERE status = 'completed'";
+    $revenueQuery = "SELECT COALESCE(SUM(total_price), 0) as total FROM orders WHERE status = 'paid'";
     $revenueStmt = $db->prepare($revenueQuery);
     $revenueStmt->execute();
     $totalRevenue = $revenueStmt->fetch(PDO::FETCH_ASSOC)['total'];
@@ -47,15 +47,15 @@ try {
         ORDER BY created_at DESC 
         LIMIT 5
         UNION ALL
-        SELECT 'nft' as type, CONCAT('New NFT: ', title) as title,
-               CONCAT('NFT \"', title, '\" was created') as description,
+        SELECT 'product' as type, CONCAT('New product: ', title) as title,
+               CONCAT('Product \"', title, '\" was created') as description,
                created_at as time, 'System' as user
-        FROM nfts 
+        FROM products 
         ORDER BY created_at DESC 
         LIMIT 5
         UNION ALL
         SELECT 'order' as type, CONCAT('New order #', id) as title,
-               CONCAT('Order for $', price, ' was placed') as description,
+               CONCAT('Order for $', total_price, ' was placed') as description,
                created_at as time, 'System' as user
         FROM orders 
         ORDER BY created_at DESC 
@@ -71,7 +71,7 @@ try {
         'success' => true,
         'data' => [
             'totalUsers' => (int)$totalUsers,
-            'totalNFTs' => (int)$totalNFTs,
+            'totalProducts' => (int)$totalProducts,
             'totalOrders' => (int)$totalOrders,
             'totalRevenue' => (float)$totalRevenue,
             'recentActivity' => $recentActivity

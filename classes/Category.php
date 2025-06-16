@@ -6,10 +6,8 @@ class Category {
     private $table_name = "categories";
 
     public $id;
+    public $name;
     public $slug;
-    public $title;
-    public $description;
-    public $thumbnail;
 
     public function __construct($db) {
         $this->conn = $db;
@@ -17,25 +15,28 @@ class Category {
 
     public function create() {
         $query = "INSERT INTO " . $this->table_name . " 
-                  SET slug=:slug, title=:title, description=:description, thumbnail=:thumbnail";
+                  SET name=:name, slug=:slug";
 
         $stmt = $this->conn->prepare($query);
 
+        $this->name = htmlspecialchars(strip_tags($this->name));
         $this->slug = htmlspecialchars(strip_tags($this->slug));
-        $this->title = htmlspecialchars(strip_tags($this->title));
-        $this->description = htmlspecialchars(strip_tags($this->description));
-        $this->thumbnail = htmlspecialchars(strip_tags($this->thumbnail));
 
+        $stmt->bindParam(":name", $this->name);
         $stmt->bindParam(":slug", $this->slug);
-        $stmt->bindParam(":title", $this->title);
-        $stmt->bindParam(":description", $this->description);
-        $stmt->bindParam(":thumbnail", $this->thumbnail);
 
         return $stmt->execute();
     }
 
+    public function readAll() {
+        $query = "SELECT id, name, slug FROM " . $this->table_name . " ORDER BY name ASC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt;
+    }
+
     public function readOneBySlug() {
-        $query = "SELECT id, slug, title, description, thumbnail 
+        $query = "SELECT id, name, slug 
                   FROM " . $this->table_name . " 
                   WHERE slug = :slug LIMIT 0,1";
 
@@ -47,38 +48,35 @@ class Category {
 
         if ($row) {
             $this->id = $row['id'];
-            $this->title = $row['title'];
-            $this->description = $row['description'];
-            $this->thumbnail = $row['thumbnail'];
+            $this->name = $row['name'];
             return true;
         }
         return false;
     }
 
-    public function updateBySlug() {
+    public function update() {
         $query = "UPDATE " . $this->table_name . " 
-                  SET title=:title, description=:description, thumbnail=:thumbnail 
-                  WHERE slug=:slug";
+                  SET name=:name, slug=:slug 
+                  WHERE id=:id";
 
         $stmt = $this->conn->prepare($query);
 
-        $this->title = htmlspecialchars(strip_tags($this->title));
-        $this->description = htmlspecialchars(strip_tags($this->description));
-        $this->thumbnail = htmlspecialchars(strip_tags($this->thumbnail));
+        $this->name = htmlspecialchars(strip_tags($this->name));
         $this->slug = htmlspecialchars(strip_tags($this->slug));
+        $this->id = htmlspecialchars(strip_tags($this->id));
 
-        $stmt->bindParam(":title", $this->title);
-        $stmt->bindParam(":description", $this->description);
-        $stmt->bindParam(":thumbnail", $this->thumbnail);
+        $stmt->bindParam(":name", $this->name);
         $stmt->bindParam(":slug", $this->slug);
+        $stmt->bindParam(":id", $this->id);
 
         return $stmt->execute();
     }
 
-    public function deleteBySlug() {
-        $query = "DELETE FROM " . $this->table_name . " WHERE slug = :slug";
+    public function delete() {
+        $query = "DELETE FROM " . $this->table_name . " WHERE id = :id";
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":slug", $this->slug);
+        $this->id = htmlspecialchars(strip_tags($this->id));
+        $stmt->bindParam(":id", $this->id);
         return $stmt->execute();
     }
 
@@ -89,34 +87,5 @@ class Category {
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row['total'];
     }
-
-    public function readAll($limit = 0, $offset = 0) {
-        $query = "SELECT id, slug, title, description, thumbnail 
-                  FROM " . $this->table_name . " 
-                  ORDER BY title ASC";
-
-        if ($limit > 0) {
-            $query .= " LIMIT :offset, :limit";
-        }
-
-        
-        $stmt = $this->conn->prepare($query);
-
-        if ($limit > 0) {
-            $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
-            $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
-        }
-
-        $stmt->execute();
-        return $stmt;
-    }
-
-    public function existsBySlug() {
-    $query = "SELECT COUNT(*) FROM categories WHERE slug = :slug";
-    $stmt = $this->conn->prepare($query);
-    $stmt->bindParam(':slug', $this->slug);
-    $stmt->execute();
-    return $stmt->fetchColumn() > 0;
 }
-
-}
+?>
